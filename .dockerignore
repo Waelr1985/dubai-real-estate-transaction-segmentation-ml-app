@@ -1,0 +1,26 @@
+# Ignore large datasets and data folders
+data/
+*.csv
+*.xlsx
+
+# Ignore virtual environments
+venv/
+.venv/
+env/
+.env/
+
+# Ignore python cache
+__pycache__/
+*.pyc
+
+# Ignore testing and local artifacts
+.pytest_cache/
+.coverage
+notebooks/
+
+# Ignore git
+.git/
+.gitignore
+
+# Ignore local models (unless you explicitly want to bundle them)
+# models/

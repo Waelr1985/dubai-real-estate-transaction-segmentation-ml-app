@@ -1,0 +1,9 @@
+name: customer-segmentation-env
+dependencies:
+  - python=3.9
+  - pip:
+    - pandas
+    - numpy
+    - scikit-learn
+    - inference-schema[numpy-support]
+    - azureml-defaults

@@ -1,0 +1,38 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Data (too large for GitHub)
+Transactions.csv
+data/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+~$*
+
+# Word temp files
+~$*.docx
+
+# Environment
+.env
+.venv/
+env/
+venv/
+
+# Logs & temp outputs
+*.log
+docker_build_log.txt

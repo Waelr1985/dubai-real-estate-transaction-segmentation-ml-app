@@ -1,0 +1,20 @@
+{
+    "numeric_medians": {
+        "procedure_area": 112.04,
+        "actual_worth": 1355888.0,
+        "meter_sale_price": 11585.965,
+        "no_of_parties_role_1": 1.0,
+        "no_of_parties_role_2": 1.0,
+        "no_of_parties_role_3": 0.0
+    },
+    "categorical_modes": {
+        "trans_group_en": "Sales",
+        "procedure_name_en": "Sell - Pre registration",
+        "property_type_en": "Unit",
+        "property_sub_type_en": "Flat",
+        "property_usage_en": "Residential",
+        "reg_type_en": "Existing Properties",
+        "rooms_en": "1 B/R",
+        "has_parking": "1"
+    }
+}

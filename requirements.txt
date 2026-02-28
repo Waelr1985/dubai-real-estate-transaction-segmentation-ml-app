@@ -1,0 +1,11 @@
+pandas
+numpy
+scikit-learn
+matplotlib
+seaborn
+jupyter
+azureml-core
+azure-ai-ml
+azure-identity
+streamlit
+plotly
