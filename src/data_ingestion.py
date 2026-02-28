@@ -6,7 +6,7 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 
 def load_data(file_path: str = RAW_DATA_PATH, sample_frac: float = 1.0, nrows: int = None) -> pd.DataFrame:
     '''
-    Loads the dataset. Because the dataset is large (~1GB), allows sampling or reading limited rows.
+    Loads the dataset. 
     '''
     try:
         logging.info(f"Loading data from {file_path}...")
