@@ -47,34 +47,94 @@ This project solves this by using a dynamic, data-driven approach, replacing man
 
 ## 3. Feature Selection & Engineering Dictionary
 
-To build a high-performance clustering model, we manually audited every raw column provided by the Dubai Land Department. Below is the breakdown of why specific features were chosen or discarded.
+To build a high-performance clustering model, we manually audited **every single column** in the raw Dubai Land Department CSV. The original dataset contains **46 columns**. Through a rigorous multi-stage filtering process, we reduced these to **15 clustering features**, which are then transformed into **11 PCA components** — the final input to K-Means.
 
-### 3.1 Selected Features (Used for Model Training)
+$$\boxed{46 \text{ raw columns} \xrightarrow{\text{Stage 1}} 22 \text{ English features} \xrightarrow{\text{Stage 2}} 15 \text{ clustering features} \xrightarrow{\text{Preprocessing}} 118 \text{ columns} \xrightarrow{\text{PCA}} 11 \text{ components}}$$
 
-| Feature | Type | Rationale for Selection |
-| :--- | :--- | :--- |
-| `actual_worth` | Numeric | The primary anchor for economic segmentation. |
-| `procedure_area` | Numeric | Distinguishes compact studios from large estates/land. |
-| `meter_sale_price` | Numeric | Acts as a "Quality Proxy" (e.g., luxury boutique vs budget mass-market). |
-| `area_name_en` | Categorical | Encoded via **Target Encoding** to capture location prestige. |
-| `trans_group_en` | Categorical | Separates the "Cash Economy" (Sales) from the "Debt Economy" (Mortgages). |
-| `property_type_en` | Categorical | Direct market category (Unit vs Villa vs Land). |
-| `property_usage_en` | Categorical | Segments Residential demand from Commercial/Investment demand. |
-| `reg_type_en` | Categorical | Slices "Off-Plan" investors from "Existing" secondary market buyers. |
-| `rooms_en` | Categorical | A direct proxy for the buyer's family size or unit capacity. |
-| `has_parking` | Categorical | Binary indicator of premium service metadata. |
-| `no_of_parties_role_...`| Numeric | Proxies for transaction complexity (Individual vs Multiple owners). |
+### 3.1 Full Column Audit — All 46 Raw Columns
 
-### 3.2 Deleted/Discarded Features
+Every column in the raw CSV was classified into one of four outcomes: **✅ Selected** for clustering, **⚙️ Engineered** (used indirectly), **🔇 Dropped** during initial load, or **🚫 Excluded** after load but before clustering.
 
-| Feature | Reason for Non-Selection |
-| :--- | :--- |
-| `transaction_id` | Unique ID. No predictive or grouping power. |
-| `instance_date` | Time metadata. Removed to focus on geometric activity profiles, not time-series drift. |
-| `rent_value` | **PLACEHOLDER NOISE**. 97.8% of rows contain the same constant value. Not real data. |
-| `meter_rent_price`| **PLACEHOLDER NOISE**. Redundant and invalid for 97%+ of transactions. |
-| `nearest_metro/...` | **REDUNDANCY**. Multi-collinear with `area_name_en`. Induces dimensionality noise. |
-| `Arabic Columns` | **REDUNDANCY**. English counterparts are used for cleaner processing. |
+| # | Raw Column | Type | Outcome | Reason |
+| :---: | :--- | :--- | :---: | :--- |
+| 1 | `transaction_id` | ID | 🚫 Excluded | Unique identifier — no predictive or grouping power. |
+| 2 | `procedure_id` | ID | 🔇 Dropped | Redundant numeric ID (English name `procedure_name_en` is used instead). |
+| 3 | `trans_group_id` | ID | 🔇 Dropped | Redundant numeric ID (English name `trans_group_en` is used instead). |
+| 4 | `trans_group_ar` | Arabic | 🔇 Dropped | Arabic duplicate of `trans_group_en`. |
+| 5 | **`trans_group_en`** | Categorical | **✅ Selected** | Separates the "Cash Economy" (Sales, 76.6%) from the "Debt Economy" (Mortgages, 19.8%) and Gifts (3.7%). |
+| 6 | `procedure_name_ar` | Arabic | 🔇 Dropped | Arabic duplicate of `procedure_name_en`. |
+| 7 | **`procedure_name_en`** | Categorical | **✅ Selected** | Specific transaction procedure (e.g., "Sell", "Mortgage Registration", "Grant"). |
+| 8 | `instance_date` | Date | ⚙️ Engineered | Parsed to extract `year` and `month`, then all three dropped — focus is on geometric activity profiles, not time-series drift. |
+| 9 | `property_type_id` | ID | 🔇 Dropped | Redundant numeric ID (English name `property_type_en` is used instead). |
+| 10 | `property_type_ar` | Arabic | 🔇 Dropped | Arabic duplicate of `property_type_en`. |
+| 11 | **`property_type_en`** | Categorical | **✅ Selected** | Direct market category — Unit vs Villa vs Land vs Building. |
+| 12 | `property_sub_type_id` | ID | 🔇 Dropped | Redundant numeric ID. |
+| 13 | `property_sub_type_ar` | Arabic | 🔇 Dropped | Arabic duplicate of `property_sub_type_en`. |
+| 14 | **`property_sub_type_en`** | Categorical | **✅ Selected** | Granular sub-type (e.g., "Flat", "Office", "Shop", "Hotel Apartment"). |
+| 15 | `property_usage_ar` | Arabic | 🔇 Dropped | Arabic duplicate of `property_usage_en`. |
+| 16 | **`property_usage_en`** | Categorical | **✅ Selected** | Segments Residential demand from Commercial/Investment/Industrial demand. |
+| 17 | `reg_type_id` | ID | 🔇 Dropped | Redundant numeric ID. |
+| 18 | `reg_type_ar` | Arabic | 🔇 Dropped | Arabic duplicate of `reg_type_en`. |
+| 19 | **`reg_type_en`** | Categorical | **✅ Selected** | Slices "Off-Plan" investors from "Existing Properties" secondary market buyers. |
+| 20 | `area_id` | ID | 🔇 Dropped | Redundant numeric ID (English name `area_name_en` is used instead). |
+| 21 | `area_name_ar` | Arabic | 🔇 Dropped | Arabic duplicate of `area_name_en`. |
+| 22 | **`area_name_en`** | Categorical | **✅ Selected (Target Encoded)** | 210+ area names → 1 numeric column via **median price per area**. Captures location prestige. |
+| 23 | `building_name_ar` | Arabic | 🔇 Dropped | Arabic duplicate. |
+| 24 | `building_name_en` | Text | 🔇 Dropped | Extremely high cardinality (thousands of buildings). Would create unmanageable OHE noise. |
+| 25 | `project_number` | ID | 🔇 Dropped | Numeric project ID — no grouping value for segmentation. |
+| 26 | `project_name_ar` | Arabic | 🔇 Dropped | Arabic duplicate. |
+| 27 | `project_name_en` | Text | 🔇 Dropped | High cardinality (thousands of projects). No segmentation value. |
+| 28 | `master_project_en` | Text | 🔇 Dropped | High cardinality. Redundant with `area_name_en` for location signal. |
+| 29 | `master_project_ar` | Arabic | 🔇 Dropped | Arabic duplicate. |
+| 30 | `nearest_landmark_ar` | Arabic | 🔇 Dropped | Arabic duplicate. |
+| 31 | `nearest_landmark_en` | Categorical | 🚫 Excluded | **Redundancy** — multi-collinear with `area_name_en`. Adds dimensionality noise without new signal. |
+| 32 | `nearest_metro_ar` | Arabic | 🔇 Dropped | Arabic duplicate. |
+| 33 | `nearest_metro_en` | Categorical | 🚫 Excluded | **Redundancy** — multi-collinear with `area_name_en`. |
+| 34 | `nearest_mall_ar` | Arabic | 🔇 Dropped | Arabic duplicate. |
+| 35 | `nearest_mall_en` | Categorical | 🚫 Excluded | **Redundancy** — multi-collinear with `area_name_en`. |
+| 36 | `rooms_ar` | Arabic | 🔇 Dropped | Arabic duplicate of `rooms_en`. |
+| 37 | **`rooms_en`** | Categorical | **✅ Selected** | Direct proxy for the buyer's family size or unit capacity. |
+| 38 | **`has_parking`** | Binary | **✅ Selected** | Premium service metadata indicator. |
+| 39 | **`procedure_area`** | Numeric | **✅ Selected** | Property size in sqm — distinguishes compact studios (67 sqm) from large estates (1,020+ sqm). |
+| 40 | **`actual_worth`** | Numeric | **✅ Selected** | Transaction value in AED — the primary anchor for economic segmentation. |
+| 41 | **`meter_sale_price`** | Numeric | **✅ Selected** | Price per sqm — acts as a "Quality Proxy" (e.g., 17,606 AED/sqm luxury vs 1,794 AED/sqm budget). |
+| 42 | `rent_value` | Numeric | 🚫 Excluded | **PLACEHOLDER NOISE**. 97.8% of rows contain the same constant value (median: 1,020,141 AED). Not real rental data. |
+| 43 | `meter_rent_price` | Numeric | 🚫 Excluded | **PLACEHOLDER NOISE**. 97.8% constant (median: 7,249.30 AED). Redundant and invalid. |
+| 44 | **`no_of_parties_role_1`** | Numeric | **✅ Selected** | Buyer count — proxy for transaction complexity (individual vs group/corporate). |
+| 45 | **`no_of_parties_role_2`** | Numeric | **✅ Selected** | Seller count — same transaction complexity signal. |
+| 46 | **`no_of_parties_role_3`** | Numeric | **✅ Selected** | Intermediary count — indicates brokerage involvement. |
+
+### 3.2 Summary Statistics
+
+| Stage | Count | Description |
+| :--- | ---: | :--- |
+| **Raw CSV Columns** | **46** | Everything from Dubai Pulse (English + Arabic + IDs + Text) |
+| 🔇 Dropped at Load (Stage 1) | 24 | 14 Arabic duplicates + 7 numeric IDs + 3 high-cardinality text fields |
+| Kept after Stage 1 | 22 | All English-language columns + numeric features |
+| 🚫 Excluded before Clustering (Stage 2) | 7 | `transaction_id`, `instance_date`→`year`/`month`, `rent_value`, `meter_rent_price`, 3× nearest\_\* |
+| **✅ Selected for Clustering** | **15** | **6 Numeric + 8 Categorical + 1 Target-Encoded** |
+| After Preprocessing (OHE expansion) | 118 | 7 scaled numeric + ~111 one-hot encoded binary columns |
+| **After PCA (90% variance)** | **11** | **Final input to K-Means** |
+
+### 3.3 The 15 Selected Features — by Role
+
+| Role | Count | Features | Preprocessing Applied |
+| :--- | :---: | :--- | :--- |
+| **Numeric** | 6 | `procedure_area`, `actual_worth`, `meter_sale_price`, `no_of_parties_role_1`, `no_of_parties_role_2`, `no_of_parties_role_3` | Log1p → RobustScaler |
+| **Categorical** | 8 | `trans_group_en`, `procedure_name_en`, `property_type_en`, `property_sub_type_en`, `property_usage_en`, `reg_type_en`, `rooms_en`, `has_parking` | OneHotEncoder |
+| **Target Encoded** | 1 | `area_name_en` → `area_name_en_encoded` (210 areas → 1 column) | Median price mapping → Log1p → RobustScaler |
+
+### 3.4 The 31 Dropped/Excluded Features — by Reason
+
+| Reason | Count | Columns |
+| :--- | :---: | :--- |
+| **Arabic Duplicates** | 14 | `trans_group_ar`, `procedure_name_ar`, `property_type_ar`, `property_sub_type_ar`, `property_usage_ar`, `reg_type_ar`, `area_name_ar`, `building_name_ar`, `project_name_ar`, `master_project_ar`, `nearest_landmark_ar`, `nearest_metro_ar`, `nearest_mall_ar`, `rooms_ar` |
+| **Redundant Numeric IDs** | 7 | `procedure_id`, `trans_group_id`, `property_type_id`, `property_sub_type_id`, `reg_type_id`, `area_id`, `project_number` |
+| **High-Cardinality Text** | 3 | `building_name_en`, `project_name_en`, `master_project_en` |
+| **Placeholder Noise** | 2 | `rent_value` (97.8% constant), `meter_rent_price` (97.8% constant) |
+| **Redundant with `area_name_en`** | 3 | `nearest_landmark_en`, `nearest_metro_en`, `nearest_mall_en` |
+| **Metadata / Identifiers** | 2 | `transaction_id` (unique ID), `instance_date` (parsed then dropped) |
+| | **31** | **Total dropped/excluded from 46 raw columns (46 − 31 = 15 selected)** |
 
 ---
 
