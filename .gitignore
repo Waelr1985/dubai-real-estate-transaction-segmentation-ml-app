@@ -36,3 +36,8 @@ venv/
 # Logs & temp outputs
 *.log
 docker_build_log.txt
+
+# Ignore Claude local settings
+
+.claude/
+NUL
