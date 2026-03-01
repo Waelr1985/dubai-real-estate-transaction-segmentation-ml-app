@@ -228,22 +228,22 @@ elif menu == "Segmentation Results":
         with tab2:
             st.markdown("### 2D PCA Cluster Visualization")
 
-            # HYBRID APPROACH: Show static image from offline training when available,
-            # otherwise compute and display dynamically for custom uploaded datasets.
+            # HYBRID APPROACH: Show static image ONLY for the full 1.6M training dataset,
+            # otherwise compute and display a fresh PCA dynamically for custom uploaded datasets.
             pca_image_shown = False
-            try:
-                import os
-                image_path = "pca_full_dataset.png"
-                if not os.path.exists(image_path) and os.path.exists("models/pca_full_dataset.png"):
-                    image_path = "models/pca_full_dataset.png"
+            if len(df) > 1500000:
+                try:
+                    import os
+                    image_path = "pca_full_dataset.png"
+                    if not os.path.exists(image_path) and os.path.exists("models/pca_full_dataset.png"):
+                        image_path = "models/pca_full_dataset.png"
 
-                if os.path.exists(image_path):
-                    st.image(image_path, use_container_width=True)
-                    st.info("Note: Showing a high-resolution static rendering of the Principal Component Analysis (PCA) generated during offline model training. This ensures extreme accuracy for the 1.6 Million historical transactions without crashing the browser.")
-                    st.caption("**What this tells us:** Because our model looks at 20 different features simultaneously (Price, Size, Location, etc.), it's impossible for humans to visualize it. This scatter plot mathematically compresses those 20 dimensions down into a simple 2D map. Seeing the different colors grouping together proves that our AI successfully detected real, distinct behavior patterns instead of just guessing.")
-                    pca_image_shown = True
-            except Exception as e:
-                st.warning(f"Could not load static PCA image: {e}")
+                    if os.path.exists(image_path):
+                        st.image(image_path, use_container_width=True)
+                        st.info("Showing the high-resolution static PCA rendering from offline model training on the full 1.6 Million transaction dataset.")
+                        pca_image_shown = True
+                except Exception as e:
+                    st.warning(f"Could not load static PCA image: {e}")
 
             if not pca_image_shown:
                 try:
