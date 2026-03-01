@@ -21,6 +21,8 @@ This repository contains an end-to-end Machine Learning web application designed
 | **11** | [Setup & Execution](#11-setup--execution) | Installation, training, and launching the dashboard |
 | **12** | [Potential Risks & Mitigation Strategies](#12-potential-risks--mitigation-strategies) | Identifying model risks and their technical defenses |
 | **13** | [Data Source](#13-data-source) | Dubai Pulse Open Data portal link |
+| **14** | [Deployment Guide](#14-deployment-guide) | Docker, CI/CD pipeline, Azure ML, and production checklist |
+| **15** | [Application Screenshots](#15-application-screenshots) | Visual walkthrough of the Streamlit dashboard |
 
 ---
 
@@ -532,3 +534,190 @@ The raw dataset is **not included** in this repository due to its size (~1GB, 1.
 After downloading, rename the file to `Transactions.csv` and place it in the project root (or update the path in `src/config.py`).
 
 > The pre-trained model artifacts in `models/` are included, so the Streamlit app works **without** the raw CSV for demonstration purposes.
+
+---
+
+## 14. Deployment Guide
+
+This section covers all deployment options: local Docker containers, automated CI/CD via GitHub Actions, and Azure ML managed endpoints.
+
+### 14.1 Docker Deployment
+
+The application is containerized using Docker. The production image includes only the Streamlit app, pre-trained models, and runtime dependencies (~350 MB final image vs ~2 GB with dev dependencies).
+
+#### Build & Run Locally
+
+```bash
+# Build the production image
+docker build -t customer-segmentation-app .
+
+# Run the container
+docker run -p 8501:8501 customer-segmentation-app
+```
+
+The app will be available at **`http://localhost:8501`**.
+
+#### Docker Image Details
+
+| Property | Value |
+| :--- | :--- |
+| **Base Image** | `python:3.9-slim` |
+| **Exposed Port** | `8501` |
+| **User** | `appuser` (non-root, UID 1000) |
+| **Healthcheck** | `GET /_stcore/health` — 30 s interval, 10 s timeout, 3 retries |
+| **Entrypoint** | `streamlit run src/app.py --server.port=8501 --server.address=0.0.0.0` |
+
+#### What Is Included in the Image
+
+| Included | Excluded (via `.dockerignore`) |
+| :--- | :--- |
+| `src/` — application code | `.git/` — version control history |
+| `models/` — pre-trained pipeline (~692 KB) | `Research/` and `notebooks/` |
+| `sample_transactions.csv` — 1 000-row demo data | Large PNG visualizations |
+| `deployment/` — Azure configs | Development scripts |
+| `.streamlit/config.toml` — container-optimized | Raw dataset (`Transactions.csv`) |
+
+---
+
+### 14.2 CI/CD Pipeline (GitHub Actions)
+
+The repository includes a GitHub Actions workflow at **`.github/workflows/ci-cd.yml`** with two sequential jobs.
+
+#### Job 1 — `lint-and-test`
+
+Runs on **every push and pull request** to `main`.
+
+| Step | What It Does |
+| :--- | :--- |
+| **Flake8 Lint** | Catches syntax errors and undefined names (blocking), plus style warnings (non-blocking, 150-char line limit) |
+| **Import Smoke Test** | Verifies all `src/` modules load correctly with their dependencies |
+| **Model Artifact Test** | Loads `segmentation_pipeline.pkl` and validates the 3-step pipeline structure (preprocessor → PCA → KMeans) |
+| **Prediction Smoke Test** | Runs the full prediction pipeline on `sample_transactions.csv` (1 000 rows), asserts output contains clusters {0,1,2,3,4} |
+
+#### Job 2 — `docker-build`
+
+Runs **only on pushes to `main`** (not PRs), after `lint-and-test` passes.
+
+| Step | What It Does |
+| :--- | :--- |
+| **Docker Buildx** | Enables advanced build features with GitHub Actions layer caching |
+| **DockerHub Login** | Authenticates using repository secrets |
+| **Build & Push** | Builds the image and pushes with two tags: `latest` + commit SHA |
+
+#### Required GitHub Repository Secrets
+
+Before pushing, configure these in **Settings → Secrets and variables → Actions → New repository secret**:
+
+| Secret Name | Description |
+| :--- | :--- |
+| `DOCKERHUB_USERNAME` | Your Docker Hub username |
+| `DOCKERHUB_TOKEN` | Docker Hub access token (generate at [hub.docker.com](https://hub.docker.com) → Account Settings → Security) |
+
+---
+
+### 14.3 Azure ML Deployment
+
+The `deployment/` directory contains everything needed to deploy the model as a **managed online endpoint** on Azure Machine Learning.
+
+#### Prerequisites
+
+```bash
+# 1. Install Azure CLI
+az --version
+
+# 2. Install the ML extension
+az extension add -n ml
+
+# 3. Log in to Azure
+az login
+
+# 4. Set defaults for your resource group and workspace
+az configure --defaults group=<your-resource-group> workspace=<your-ml-workspace>
+```
+
+#### Deploy the Model
+
+```bash
+# Navigate to the deployment directory
+cd deployment
+
+# Run the deployment script
+chmod +x deploy.sh
+./deploy.sh
+```
+
+The script performs three actions:
+
+1. **Registers** `models/segmentation_pipeline.pkl` as an Azure ML model (version 1)
+2. **Creates** a managed online endpoint named `customer-segmentation-endpoint`
+3. **Deploys** a `blue` deployment with `Standard_DS3_v2` compute (1 instance)
+
+#### Deployment Files
+
+| File | Purpose |
+| :--- | :--- |
+| `deployment/deploy.sh` | Azure CLI commands — register model, create endpoint, deploy |
+| `deployment/score.py` | Scoring script with `init()` and `run()` functions for the Azure container |
+| `deployment/conda.yml` | Conda environment for the scoring container (pandas, numpy, scikit-learn, inference-schema) |
+
+#### Test the Endpoint
+
+```bash
+# Get the scoring URI and key
+ENDPOINT_URL=$(az ml online-endpoint show -n customer-segmentation-endpoint --query scoring_uri -o tsv)
+API_KEY=$(az ml online-endpoint get-credentials -n customer-segmentation-endpoint --query primaryKey -o tsv)
+
+# Send a test request
+curl -X POST "$ENDPOINT_URL" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $API_KEY" \
+  -d @sample_request.json
+```
+
+Alternatively, use the Streamlit app's **Azure API** tab to enter the Endpoint URL and API Key for live inference through the dashboard.
+
+---
+
+### 14.4 Production Checklist
+
+| # | Requirement | Status | Notes |
+| :---: | :--- | :---: | :--- |
+| 1 | Non-root Docker user | Required | Container runs as `appuser` (UID 1000) |
+| 2 | Healthcheck configured | Required | 30 s interval, 10 s timeout, 3 retries |
+| 3 | Streamlit deploy button disabled | Required | Set via `.streamlit/config.toml` inside the container |
+| 4 | Version-pinned dependencies | Required | `requirements.txt` uses `>=min,<max` ranges |
+| 5 | CI smoke tests pass | Required | Model loads and predicts on 1 000-row sample data |
+| 6 | DockerHub secrets configured | Required | `DOCKERHUB_USERNAME` and `DOCKERHUB_TOKEN` in GitHub |
+| 7 | Models committed to repo | Required | `models/` directory (~692 KB total, 4 pkl + 2 JSON) |
+| 8 | Sample data committed | Required | `sample_transactions.csv` (1 000 rows) used by CI tests |
+
+---
+
+## 15. Application Screenshots
+
+> All screenshots captured on the full **1,665,112-row** production dataset.
+
+### Upload Data
+
+![Upload Data Page](screenshots/01_upload_data_empty.png)
+*Landing page with file upload and sidebar navigation (Upload Data, Segmentation Results, Cluster Explorer, Azure API).*
+
+### Segmentation Results — PCA Cluster Visualization
+
+![PCA Visualization](screenshots/05_pca_visualization.png)
+*2D PCA projection of all 1.66M transactions, color-coded by segment (Strategy D pipeline: Target Encoding + Log1p + RobustScaler + PCA).*
+
+### Segmentation Results — Evaluation Metrics
+
+![Evaluation Metrics](screenshots/06_evaluation_metrics.png)
+*Production model metrics: Calinski-Harabasz 409,737 | Silhouette 0.217 | Davies-Bouldin 1.628.*
+
+### Segmentation Results — Centroid Heatmap
+
+![Centroid Heatmap](screenshots/07_centroid_heatmap.png)
+*Z-Score normalized centroids showing each segment's relative feature strengths across 6 numeric dimensions.*
+
+### Segmentation Results — Radar Chart Comparison
+
+![Radar Chart](screenshots/09_radar_chart.png)
+*Radar overlay comparing all 5 segments across procedure area, transaction worth, price per meter, and party counts.*

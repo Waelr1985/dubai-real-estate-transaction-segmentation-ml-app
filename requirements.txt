@@ -1,11 +1,10 @@
-pandas
-numpy
-scikit-learn
-matplotlib
-seaborn
-jupyter
-azureml-core
-azure-ai-ml
-azure-identity
-streamlit
-plotly
+# ── Production Dependencies ──
+# Minimal set required to run the Streamlit dashboard with local model inference.
+# For development/Azure extras, see requirements-dev.txt
+
+pandas>=2.0.0,<3.0.0
+numpy>=1.24.0,<2.0.0
+scikit-learn>=1.3.0,<2.0.0
+streamlit>=1.28.0,<2.0.0
+plotly>=5.18.0,<6.0.0
+requests>=2.31.0,<3.0.0

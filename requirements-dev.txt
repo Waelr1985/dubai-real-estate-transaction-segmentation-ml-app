@@ -1,0 +1,20 @@
+# ── Development Dependencies ──
+# Includes all production deps + visualization, notebooks, testing, and Azure ML.
+
+-r requirements.txt
+
+# Visualization (src/visualize.py, offline charts)
+matplotlib>=3.7.0,<4.0.0
+seaborn>=0.12.0,<1.0.0
+
+# Notebooks
+jupyter>=1.0.0,<2.0.0
+
+# Testing & Linting
+pytest>=7.4.0,<9.0.0
+flake8>=6.0.0,<8.0.0
+
+# Azure ML (only needed when deploying to Azure)
+azureml-core>=1.53.0,<2.0.0
+azure-ai-ml>=1.12.0,<2.0.0
+azure-identity>=1.14.0,<2.0.0

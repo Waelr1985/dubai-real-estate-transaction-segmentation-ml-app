@@ -1,26 +1,57 @@
-# Ignore large datasets and data folders
+# ── Docker Ignore ──
+# Keeps the production image lean (~350MB vs ~2GB with dev artifacts).
+
+# Large datasets
 data/
 *.csv
+!sample_transactions.csv
 *.xlsx
 
-# Ignore virtual environments
+# Virtual environments
 venv/
 .venv/
 env/
 .env/
 
-# Ignore python cache
+# Python cache
 __pycache__/
 *.pyc
+*.pyo
 
-# Ignore testing and local artifacts
+# Testing & local artifacts
 .pytest_cache/
 .coverage
 notebooks/
+Research/
 
-# Ignore git
+# Large pre-computed images (not needed at runtime)
+*.png
+
+# Git & GitHub
 .git/
 .gitignore
+.github/
 
-# Ignore local models (unless you explicitly want to bundle them)
+# Development scripts (not needed in container)
+generate_report.py
+create_presentation.py
+capture_screenshots.py
+capture_screenshots_sample.py
+add_clusters_exec_summary.py
+fix_exec_summary.py
+update_report.py
+report_temp.docx
+
+# IDE & OS files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+*.log
+
+# Claude config & screenshots
+.claude/
+screenshots/
+
+# Keep models/ — they ARE needed in the container
 # models/

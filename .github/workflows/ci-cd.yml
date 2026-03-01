@@ -7,51 +7,120 @@ on:
     branches: [ "main" ]
 
 jobs:
-  build-and-test:
+  # ================================================================
+  # Job 1: Lint + Smoke Tests
+  # Runs on every push & PR. Validates code quality and model health.
+  # ================================================================
+  lint-and-test:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v3
-    
+    - uses: actions/checkout@v4
+
     - name: Set up Python 3.9
-      uses: actions/setup-python@v4
+      uses: actions/setup-python@v5
       with:
         python-version: "3.9"
-        
-    - name: Install dependencies
+        cache: "pip"
+
+    - name: Install production dependencies
       run: |
         python -m pip install --upgrade pip
         pip install -r requirements.txt
-        
-    - name: Run Schema & Drift Baseline Tests
+
+    - name: Install test tools
+      run: pip install flake8
+
+    - name: Lint with flake8
       run: |
-        # In a real environment, you'd have actual pytest scripts here.
-        # This just verifies the training script boots and finishes successfully on small sample data.
-        python src/model_training.py
-        
+        # Blocking: syntax errors and undefined names
+        flake8 src/ --count --select=E9,F63,F7,F82 --show-source --statistics
+        # Non-blocking: style warnings (generous line length to match project style)
+        flake8 src/ --count --exit-zero --max-complexity=15 --max-line-length=150 --statistics
+
+    - name: Smoke test — module imports
+      run: |
+        python -c "from src.config import FEATURES_TO_KEEP, NUMERIC_FEATURES, CATEGORICAL_FEATURES; print('Config OK:', len(FEATURES_TO_KEEP), 'features')"
+        python -c "from src.data_validation import validate_data, check_data_drift; print('Validation OK')"
+        python -c "from src.data_preprocessing import get_preprocessor, apply_target_encoding; print('Preprocessing OK')"
+        python -c "import streamlit; print('Streamlit OK:', streamlit.__version__)"
+
+    - name: Smoke test — model artifact loads correctly
+      run: |
+        python -c "
+        import pickle, json, os
+        # 1. Load the full pipeline
+        with open('models/segmentation_pipeline.pkl', 'rb') as f:
+            pipeline = pickle.load(f)
+        steps = [s[0] for s in pipeline.steps]
+        assert steps == ['preprocessor', 'pca', 'kmeans'], f'Unexpected steps: {steps}'
+        print(f'Pipeline OK: {steps}')
+
+        # 2. Check target encoding mappings exist
+        with open('models/target_encoding_mappings.json') as f:
+            te = json.load(f)
+        n_areas = len(te.get('area_name_en', {}))
+        assert n_areas > 100, f'Expected 100+ area mappings, got {n_areas}'
+        print(f'Target encoding OK: {n_areas} areas')
+
+        # 3. Check baseline stats exist
+        with open('models/baseline_stats.json') as f:
+            stats = json.load(f)
+        assert 'numeric_medians' in stats and 'categorical_modes' in stats
+        print(f'Baseline stats OK: {len(stats[\"numeric_medians\"])} numeric, {len(stats[\"categorical_modes\"])} categorical')
+        "
+
+    - name: Smoke test — end-to-end prediction on sample data
+      run: |
+        python -c "
+        import pandas as pd, pickle
+        from src.data_validation import validate_data
+        from src.data_preprocessing import apply_target_encoding
+
+        df = pd.read_csv('sample_transactions.csv')
+        print(f'Loaded {len(df)} sample rows')
+
+        df_clean = validate_data(df)
+        df_clean = apply_target_encoding(df_clean)
+
+        with open('models/segmentation_pipeline.pkl', 'rb') as f:
+            pipeline = pickle.load(f)
+
+        clusters = pipeline.predict(df_clean)
+        assert len(clusters) == len(df_clean), 'Row count mismatch'
+        assert set(clusters).issubset({0,1,2,3,4}), f'Unexpected clusters: {set(clusters)}'
+        print(f'Prediction OK: {len(clusters)} rows -> clusters {sorted(set(clusters))}')
+        print('All smoke tests PASSED')
+        "
+
+  # ================================================================
+  # Job 2: Docker Build & Push to Docker Hub
+  # Only runs on main-branch pushes AFTER tests pass.
+  # ================================================================
   docker-build:
-    needs: build-and-test
+    needs: lint-and-test
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-    
+
     steps:
-    - uses: actions/checkout@v3
-    
+    - uses: actions/checkout@v4
+
     - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v2
-      
+      uses: docker/setup-buildx-action@v3
+
     - name: Login to DockerHub
-      uses: docker/login-action@v2
+      uses: docker/login-action@v3
       with:
-        # You need to add these secrets in your GitHub Repository settings
         username: ${{ secrets.DOCKERHUB_USERNAME }}
         password: ${{ secrets.DOCKERHUB_TOKEN }}
-        
+
     - name: Build and push Docker image
-      uses: docker/build-push-action@v4
+      uses: docker/build-push-action@v6
       with:
         context: .
         push: true
         tags: |
           ${{ secrets.DOCKERHUB_USERNAME }}/customer-segmentation-app:latest
           ${{ secrets.DOCKERHUB_USERNAME }}/customer-segmentation-app:${{ github.sha }}
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
