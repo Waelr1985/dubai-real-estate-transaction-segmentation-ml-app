@@ -346,6 +346,8 @@ The algorithm requires us to tell it how many segments ($k$) to find. We tested 
 
 ### 9.2 The Decision Logic
 
+![Elbow Method and Silhouette Score Evaluation](screenshots/elbow_chart_annotated.png)
+
 1. **The Math (Variance and Cohesion):** The Calinski-Harabasz (CH) score measures how dense and well-separated the clusters are (higher is better). The Silhouette score measures how similar an object is to its own cluster compared to others. While $k=3$ mathematically scores slightly higher because it's easy to just broadly separate "cheap vs. expensive," $k=5$ represents the final "elbow" where the scores stabilize before rapidly dropping off for $k=6$ and beyond.
 2. **The Business Logic:** While 3 clusters might be fundamentally simple to slice, they are practically useless for targeted marketing. Conversely, managing 10 distinct marketing profiles creates severe operational fatigue. **5 clusters** provides the optimal balance: granular enough to launch bespoke campaigns (Budget vs. Luxury vs. Commercial), but consolidated enough for clean executive reporting.
 
