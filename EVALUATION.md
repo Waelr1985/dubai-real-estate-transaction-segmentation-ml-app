@@ -184,7 +184,8 @@ from src.data_preprocessing import apply_target_encoding
 
 df = pd.read_csv('sample_transactions.csv')
 df = apply_target_encoding(validate_data(df))
-pipe = pickle.load(open('models/segmentation_pipeline.pkl','rb'))
+with open('models/segmentation_pipeline.pkl', 'rb') as f:
+    pipe = pickle.load(f)
 
 t0=time.time(); y=pipe.predict(df); dt=time.time()-t0
 print('rows=',len(df),'seconds=',round(dt,4),'rows_per_sec=',round(len(df)/dt,2))
