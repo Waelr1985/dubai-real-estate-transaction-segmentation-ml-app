@@ -58,8 +58,10 @@ df = pd.read_csv('sample_transactions.csv')
 df = validate_data(df)
 df = apply_target_encoding(df)
 
-pre = pickle.load(open('models/preprocessor.pkl','rb'))
-km = pickle.load(open('models/kmeans_model.pkl','rb'))
+with open('models/preprocessor.pkl', 'rb') as f:
+    pre = pickle.load(f)
+with open('models/kmeans_model.pkl', 'rb') as f:
+    km = pickle.load(f)
 
 sil, db = evaluate_clusters(df.copy(), pre, km)
 print('silhouette=', sil, 'davies_bouldin=', db)
