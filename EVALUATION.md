@@ -188,7 +188,7 @@ with open('models/segmentation_pipeline.pkl', 'rb') as f:
     pipe = pickle.load(f)
 
 t0=time.time(); y=pipe.predict(df); dt=time.time()-t0
-print('rows=',len(df),'seconds=',round(dt,4),'rows_per_sec=',round(len(df)/dt,2))
+print('rows=',len(df),'seconds=',round(dt,4),'rows_per_sec=',round(len(df)/dt,2) if dt > 0 else 'N/A (dt=0)')
 PY
 ```
 
